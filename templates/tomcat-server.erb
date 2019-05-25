@@ -3,7 +3,7 @@ def get_var(value, regex)
   if ( value =~ regex )
     return value
   else
-    raise ArgumentError, "#{value} does not match to #{regex}"
+    raise ArgumentError, ">>>#{value}<<< does not match to regex >>>#{regex}<<< : #{caller[0]}"
   end
 end
 -%>
@@ -72,11 +72,11 @@ tomcat_pids(){
 #### 
 #### MAIN
 
-TOMCAT_INSTANCE="<%= @instancename %>"
-TOMCAT_PATH="<%= @deploymentdir %>"
-TOMCAT_LOGDIR="<%= @logbasedir %>/<%= @instancename %>"
-TOMCAT_USER="<%= @user %>"
-TOMCAT_GROUP="<%= @group %>"
+TOMCAT_INSTANCE="<%= get_var(@instancename, /.+/) %>"
+TOMCAT_PATH="<%= get_var(@deploymentdir, /.+/) %>"
+TOMCAT_LOGDIR="<%= get_var(@logbasedir,/.+/) %>/<%= get_var(@instancename,/.+/) %>"
+TOMCAT_USER="<%= get_var(@user,/.+/) %>"
+TOMCAT_GROUP="<%= get_var(@group,/.+/) %>"
 
 echo "******************************************************************************"
 echo "TOMCAT INSTANCE : $TOMCAT_INSTANCE"
@@ -91,12 +91,22 @@ COMMAND="$1"
 TOMCAT_PIDS="$(tomcat_pids $TOMCAT_PATH 2>/dev/null)"
 
 if [ "$COMMAND" == "status" ] || [ "$COMMAND" == "monitor" ];then
+       RET="0"
+<% if @template_params.key?('status_command') %>
+       execute "<%= @template_params['status_command'] %>" $TOMCAT_USER
+       RET="$?"
+<% end %>
        for pid in $TOMCAT_PIDS;do
 	      RUNTIME="$(ps -p $pid ho etime |awk '{print $1}') $RUNTIME"
        done
        if [ -n "$TOMCAT_PIDS" ];then
-        echo "STATUS          : RUNNING (PID $TOMCAT_PIDS, RUNTIME $RUNTIME)"
-        exit 0
+           if [ "$RET" = "0" ];then
+              echo "STATUS          : RUNNING (PID $TOMCAT_PIDS, RUNTIME $RUNTIME)"
+              exit 0
+           else
+              echo "STATUS          : RUNNING, BUT FAILED STATUS (PID $TOMCAT_PIDS, RUNTIME $RUNTIME)"
+              exit $RET
+           fi
        else
         echo "STATUS          : STOPPED"
         exit 1
@@ -121,7 +131,6 @@ trap "cleanup" EXIT TERM INT
 
 case "$COMMAND" in
   start)
-
     if [ -n "$TOMCAT_PIDS" ];then
          echo
 	      echo "WARNING: Instance is already running, skipping start"
@@ -143,7 +152,11 @@ case "$COMMAND" in
     chown -R $TOMCAT_USER:$TOMCAT_GROUP $TOMCAT_LOGDIR
     chmod -R 750 $TOMCAT_LOGDIR
     echo
+<% if @template_params.key?('start_command') %>
+    execute "<%= @template_params['start_command'] %>" $TOMCAT_USER
+<% else %>
     execute "cd $TOMCAT_PATH ; bin/startup.sh" $TOMCAT_USER
+<% end %>
     # backup exit status, to bypass signal handler
     RET="$?"
     exit $RET
@@ -158,14 +171,22 @@ case "$COMMAND" in
     echo "INVOKING: $TOMCAT_PATH/bin/catalina.sh run"
     echo
     echo "STOP WITH: STRG + c"
+<% if @template_params.key?("run_command") %>
+    execute "<%= @template_params['run_command'] %>" $TOMCAT_USER
+<% else %>
     execute "cd $TOMCAT_PATH ; bin/catalina.sh run" $TOMCAT_USER
+<% end %>
     ;;
   stop)
     echo "****************************************************************************************************"
     if [ -n "$TOMCAT_PIDS" ];then
       echo "INVOKING: $TOMCAT_PATH/bin/shutdown.sh"
       shift
+<% if @template_params.key?('stop_command') %>
+      execute "<%= @template_params['stop_command'] %>" $TOMCAT_USER
+<% else %>
       execute "cd $TOMCAT_PATH ; bin/shutdown.sh $@" $TOMCAT_USER
+<% end %>
       RET="$?"
     else
       echo "<no corosponding process found>"

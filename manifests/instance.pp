@@ -6,6 +6,7 @@ define tomcat::instance (
   String $user                                                           = $tomcat::user,
   String $group                                                          = $tomcat::group,
   Boolean $manage_usergroup                                              = false,
+  Boolean $manage_setenv                                                 = true,
   Variant[Enum['present', 'absent'], String] $default_webapp_docs        = absent,
   Variant[Enum['present', 'absent'], String] $default_webapp_examples    = absent,
   Variant[Enum['present', 'absent'], String] $default_webapp_hostmanager = present,
@@ -13,7 +14,7 @@ define tomcat::instance (
   Variant[Enum['present', 'absent'], String] $default_webapp_root        = present,
   Boolean $enable_service                                                = true,
   Boolean $notify_service                                                = true,
-  Variant[Enum['running', 'stoppe'], String] $ensure                     = 'running',
+  Variant[Enum['running', 'stopped'], String] $ensure                    = 'running',
   Stdlib::Absolutepath $logbasedir                                       = "/var/log/tomcat",
   String $javaheapopts                                                   = "-Xms256M -Xmx768M",
   String $javaopts                                                       = "",
@@ -22,12 +23,18 @@ define tomcat::instance (
   String $mysqldbjar                                                     = "",
   String $mariadbjar                                                     = "",
   String $context_xml_template                                           = 'tomcat/context.xml.erb',
+  String $setenv_template                                                = 'tomcat/setenv.sh.erb',
+  String $server_xml_template                                            = 'tomcat/server.xml.erb',
+  Optional[String] $root_xml_template                                    = undef,
   Hash $template_params                                                  = {},
   String $instance_archive_base_logdir                                   = "",
   String $port_prefix                                                    = '',
   String $port_sub_prefix                                                = '8',
   String $debug_port                                                     = "no",
   String $maxThreads                                                     = "100",
+  String $max_header_size                                                = "4096",
+  String $max_PostSize                                                   = "10000000",
+  String $max_ParameterCount                                             = "40000",
   Array[String] $setenv_extra                                            = [],
   String $logrotate_crontab_spec                                         = "0 3 * * *",
 ) {
@@ -77,7 +84,7 @@ define tomcat::instance (
 
   exec { "create_target_tomcat-${instancename}":
     cwd     => '/',
-    command => "mkdir -p ${deploymentdir}",
+    command => "mkdir -p ${deploymentdir}/",
     creates => $deploymentdir,
     require => Exec["extract_tomcat-${instancename}"],
   }
@@ -243,6 +250,23 @@ define tomcat::instance (
     content => template('tomcat/tomcat-users.conf.erb'),
     require => Exec["move_tomcat-${instancename}"],
   }
+
+  file { "${deploymentdir}/conf/jmxremote.password":
+    owner   => $user,
+    group   => $group,
+    mode    => '0700',
+    content => "${adminuser} ${adminpassword}",
+    require => Exec["move_tomcat-${instancename}"],
+  }
+
+  file { "${deploymentdir}/conf/jmxremote.access":
+    owner   => $user,
+    group   => $group,
+    mode    => '0700',
+    content => "${adminuser} readwrite",
+    require => Exec["move_tomcat-${instancename}"],
+  }
+
   if $notify_service {
     File["${deploymentdir}/conf/tomcat-users.xml"] ~> Service["tomcat-${instancename}"]
   }
@@ -251,23 +275,41 @@ define tomcat::instance (
     owner   => $user,
     group   => $group,
     mode    => '0740',
-    content => template("${context_xml_template}"),
+    content => template($context_xml_template),
     require => Exec["move_tomcat-${instancename}"],
   }
   file { "${deploymentdir}/conf/server.xml":
     owner   => $user,
     group   => $group,
     mode    => '0740',
-    content => template('tomcat/server.xml.erb'),
+    content => template($server_xml_template),
     require => Exec["move_tomcat-${instancename}"],
   }
 
-  file { "${deploymentdir}/bin/setenv.sh":
-    owner   => $user,
-    group   => $group,
-    mode    => '0700',
-    content => template('tomcat/setenv.sh.erb'),
-    require => Exec["move_tomcat-${instancename}"],
+  if $root_xml_template {
+    file { ["${deploymentdir}/conf/Catalina/", "${deploymentdir}/conf/Catalina/localhost"]:
+      ensure => 'directory',
+      owner  => $user,
+      group  => $group,
+      mode   => '0755',
+    }
+    ->file { "${deploymentdir}/conf/Catalina/localhost/ROOT.xml":
+      owner   => $user,
+      group   => $group,
+      mode    => '0640',
+      content => template($root_xml_template),
+      require => Exec["move_tomcat-${instancename}"],
+    }
+  }
+
+  if $manage_setenv {
+    file { "${deploymentdir}/bin/setenv.sh":
+      owner   => $user,
+      group   => $group,
+      mode    => '0700',
+      content => template($setenv_template),
+      require => Exec["move_tomcat-${instancename}"],
+    }
   }
 
   service { "tomcat-${instancename}":
@@ -278,6 +320,8 @@ define tomcat::instance (
     require    => [
       File["$logbasedir/$instancename"],
       File["${deploymentdir}/conf/tomcat-users.xml"],
+      File["${deploymentdir}/conf/jmxremote.access"],
+      File["${deploymentdir}/conf/jmxremote.password"],
       File["${deploymentdir}/conf/server.xml"],
       File["${deploymentdir}/conf/context.xml"],
       File["${deploymentdir}/bin/setenv.sh"],

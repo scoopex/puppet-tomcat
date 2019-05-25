@@ -11,10 +11,10 @@ tomcat::instances:
   'foobar1':
      port_prefix: "1"
      port_sub_prefix: "0"
-     downloadurl: "http://ftp-stud.hs-esslingen.de/pub/Mirrors/ftp.apache.org/dist/tomcat/tomcat-9/v9.0.12/bin/apache-tomcat-9.0.12.tar.gz"
-     tarball: "apache-tomcat-9.0.12.tar.gz"
+     downloadurl: "http://ftp-stud.hs-esslingen.de/pub/Mirrors/ftp.apache.org/dist/tomcat/tomcat-9/v9.0.19/bin/apache-tomcat-9.0.19.tar.gz"
+     tarball: "apache-tomcat-9.0.19.tar.gz"
      deploymentdir: "/srv/tomcat/foobar1"
-     javaheapopts: "-Xms64M -Xmx256M"
+     javaheapopts: ""
      javaopts: ""
      default_webapp_docs: 'absent'
      default_webapp_examples: 'absent'
@@ -23,13 +23,17 @@ tomcat::instances:
      default_webapp_root: 'absent'
      adminuser: 'admin'
      adminpassword: 'admin'
+     root_xml_template: 'tomcat/ROOT.xml.erb'
      template_params:
+        run_command: 'echo run is not available on this instance; false'
+        status_command: 'echo WOW COOL;true'
         mysql_jndi: "jdbc/fooDB"
         mysql_username: "foobar"
         mysql_password: "foobar"
-        mysql_jdbcurl: "jdbc:mysql://127.0.0.1:3306/bar_foobar?useUnicode=true;characterEncoding=utf8"
+        mysql_jdbcurl: "jdbc:mysql://127.0.0.1:3306/bar_foobar"
+        mysql_connection_properties: "useUnicode=true;characterEncoding=utf8"
         mysql_removeAbandonedTimeout: "600"
-        mysql_driverclass: "com.mysql.jdbc.Driver"
+        mysql_driverclass: "com.mysql.cj.jdbc.Driver"
      mariadbjar: "http://central.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar"
      instance_archive_base_logdir: '/tmp/'
      setenv_extra:
@@ -38,8 +42,8 @@ tomcat::instances:
   'foobar2':
      port_prefix: "2"
      port_sub_prefix: "0"
-     downloadurl: "http://ftp-stud.hs-esslingen.de/pub/Mirrors/ftp.apache.org/dist/tomcat/tomcat-9/v9.0.12/bin/apache-tomcat-9.0.12.tar.gz"
-     tarball: "apache-tomcat-9.0.12.tar.gz"
+     downloadurl: "http://ftp-stud.hs-esslingen.de/pub/Mirrors/ftp.apache.org/dist/tomcat/tomcat-9/v9.0.19/bin/apache-tomcat-9.0.19.tar.gz"
+     tarball: "apache-tomcat-9.0.19.tar.gz"
      deploymentdir: "/srv/tomcat/foobar2"
      javaheapopts: "-Xms64M -Xmx256M"
      javaopts: ""
@@ -54,9 +58,10 @@ tomcat::instances:
         mysql_jndi: "jdbc/fooDB"
         mysql_username: "foobar"
         mysql_password: "foobar"
-        mysql_jdbcurl: "jdbc:mysql://127.0.0.1:3306/bar_foobar?useUnicode=true;characterEncoding=utf8"
+        mysql_jdbcurl: "jdbc:mysql://127.0.0.1:3306/bar_foobar"
+        mysql_connection_properties: "useUnicode=true;characterEncoding=utf8"
         mysql_removeAbandonedTimeout: "600"
-        mysql_driverclass: "com.mysql.jdbc.Driver"
+        mysql_driverclass: "com.mysql.cj.jdbc.Driver"
      mariadbjar: "http://central.maven.org/maven2/mysql/mysql-connector-java/8.0.11/mysql-connector-java-8.0.11.jar"
      instance_archive_base_logdir: '/tmp/'
      setenv_extra:
